@@ -1,6 +1,7 @@
 library(RMySQL)
 library(stringr)
 library(stringdist)
+setwd("/home/ismael/Trabajo/Actualiza/")
 con <- dbConnect(MySQL(), user="root", password="papidorl", 
                  dbname="hoteles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
 load("~/Trivago/Datos/hoteles(25.1.16).RData")
@@ -235,41 +236,32 @@ reconstruye=function(admincodes){
   }
   return(temp)
 }
+
 admincodes1=reconstruye(admincodes1)
 admincodes2=reconstruye(admincodes2)
 
 #Busco primero las provincias por coincidencia directa en la base de datos de ciudades con más de 1000 habitantes
-for(i in 8012:nrow(hotelbeds)){
-  cat(i,"de",nrow(hotelbeds),"\n")
+for(i in 1:nrow(hotelbeds)){
+  cat(i,"de",nrow(hotelbeds),hotelbeds$city[i],"\n")
   codigo<-ciudades1000[which(ciudades1000$country_code==hotelbeds$country_code[i] & 
                                str_to_upper(iconv(ciudades1000$name,to="ASCII//TRANSLIT"))==str_to_upper(iconv(hotelbeds$city[i],to="ASCII//TRANSLIT"))),
                        c("country_code","admin1.code","admin2.code","admin3.code")]
   if(nrow(codigo)!=1){
     cat("No se encuentra",hotelbeds$city[i],"\n")
-  }else{
-      if(codigo[,"admin2.code"]==""){
-        temp=admincodes2[which(codigo[,1]==admincodes2[,1] & codigo[,2]==admincodes2[,2]),4]
-        if(length(temp)==1){
-          hotelbeds$province[i]=temp
-          cat(hotelbeds$province[i],"\n")
-          #     }else if(length(temp)>1){
-          #       temp=admincodes[which(codigo[,1]==admincodes[,1] & codigo[,2]==admincodes[,2] & codigo[,3]==admincodes[,3]),4]
-          #       hotelbeds$province[i]=temp
-          #       cat(hotelbeds$province[i],"\n")
-        }else if(length(temp)==0){
-          cat("No se encuentra",hotelbeds$city[i],"\n")
-        }
-      }else if(codigo[,"admin2.code"]!=""){
-        temp=admincodes1[which(codigo[,1]==admincodes1[,1] & codigo[,2]==admincodes1[,2] & codigo[,3]==admincodes1[,3]),4]
-        if(length(temp)==1){
-          hotelbeds$province[i]=temp
-          cat(hotelbeds$province[i],"\n")
-        }else if(length(temp)==0){
-          cat("No se encuentra",hotelbeds$city[i],"\n")
-        }
-      }else if(nrow(codigo)==0){
+  }else if(nrow(codigo)==1){
+    temp=admincodes1[which(codigo[,1]==admincodes1[,1] & codigo[,2]==admincodes1[,2] & codigo[,3]==admincodes1[,3]),4]
+    if(length(temp)==1){
+      hotelbeds$province[i]=temp
+      cat(hotelbeds$province[i],"\n")
+    }else if(length(temp)!=1){
+      temp=admincodes2[which(codigo[,1]==admincodes2[,1] & codigo[,2]==admincodes2[,2]),4]
+      if(length(temp)==1){
+        hotelbeds$province[i]=temp
+        cat(hotelbeds$province[i],"\n")
+      }else if(length(temp)!=1){
         cat("No se encuentra",hotelbeds$city[i],"\n")
       }
+    }
   }
 }
   
@@ -284,16 +276,24 @@ for (i in indices){
   if(codigo[,2]==""){
     codigo=candidatos[order(distancias)[2],c("country_code","admin1.code","admin2.code")]
   }
-  codigo=cbind(names(which.max(table(codigo[,1]))),names(which.max(table(codigo[,2]))),names(which.max(table(codigo[,3]))))
-  provincia=admincodes[which(codigo[,1]==admincodes[,1] & codigo[,2]==admincodes[,2]),4]
+#  codigo=cbind(names(which.max(table(codigo[,1]))),names(which.max(table(codigo[,2]))),names(which.max(table(codigo[,3]))))
+  provincia=admincodes1[which(codigo[,1]==admincodes1[,1] & codigo[,2]==admincodes1[,2]),4]
   if(length(provincia)==1){
     hotelbeds$province[i]=provincia
-  }else if(length(provincia>1)){
-    hotelbeds$province[i]=admincodes[which(codigo[,1]==admincodes[,1] & codigo[,2]==admincodes[,2] & codigo[,3]==admincodes[,3]),4]
-  }else if(length(provincia)==0){
-    hotelbeds$province[i]=NA
+  }else if(length(provincia)>1){
+    provincia=admincodes1[which(codigo[,1]==admincodes1[,1] & codigo[,2]==admincodes1[,2] & codigo[,3]==admincodes1[,3]),4]
+    if(length(provincia)==1){
+      hotelbeds$province[i]=provincia
+    }else{
+      provincia=admincodes2[which(codigo[,1]==admincodes2[,1] & codigo[,2]==admincodes2[,2]),4]
+      if(length(provincia)==1){
+        hotelbeds$province[i]=provincia
+      }else{
+        hotelbeds$province[i]=NA
+      }
+    }
   }
-  cat(match(i,indices),"de",length(indices),hotelbeds$province[i],"\n")
+  cat(match(i,indices),"de",length(indices),hotelbeds$city[i],hotelbeds$province[i],"\n")
 }
 
 #Busco las provincias que quedan en los datos facilitados por HB (meten regiones y barrios como provincias)
@@ -301,11 +301,30 @@ indices=which(is.na(hotelbeds$province))
 provincias=destid[match(hotels$city_code[match(hotelbeds$prov_id[indices],hotels$prov_id)],destid$code),2]
 for(i in 1:length(provincias)){
   if(nchar(gsub(".* - ","",provincias[i]))==2){
-    provincias[i]=admincodes[which(admincodes[,1]=="US"),][(match(gsub(".* - ","",provincias[i]),admincodes[which(admincodes[,1]=="US"),2])),4]
+    provincias[i]=admincodes1[which(admincodes1[,1]=="US"),][(match(gsub(".* - ","",provincias[i]),admincodes1[which(admincodes1[,1]=="US"),2])),4]
   }
 }
 hotelbeds$province[indices]=provincias
 
+save(hotelbeds,file="hotelbeds.RData")
+
 ###########
-i18n=cbind(i18n,code1=NA,code2=NA)
-admincodes1[admincodes1[,1]==i18n[1,3],2:3][which(sapply(1:length(prueba),function(i) (muestra[1,2] %in% str_to_upper(strsplit(admincodes1[admincodes1[,1]==muestra[1,3],4],split=" ")[[i]])))),]
+hotelbeds$id=hoteles$id[match(hotelbeds$prov_id,hoteles$prov_id)]
+hotelbeds$prov="HB"
+
+id=721705
+for(i in 1:nrow(hotelbeds)){
+  if(is.na(hotelbeds$id[i])){
+    cat(i,id,hotelbeds$prov_id[i],"\n")
+    hotelbeds$id[i]=id
+    id=id+1
+  }
+}
+
+#dbWriteTable(conn = con,name = "hotelbeds",value = hotelbeds,overwrite=F,row.names=F)
+
+hotelbeds=dbGetQuery(conn=con,"select * from hotelbeds")
+
+#Tocaría ejecutar el script zonashorarias
+
+hotelbeds=dbWriteTable(conn=con,name = "hotelbeds",value = hotelbeds,overwrite=T,row.names=F)

@@ -3,7 +3,7 @@ library(stringr)
 library(stringdist)
 con <- dbConnect(MySQL(), user="root", password="papidorl", 
                  dbname="hoteles", host="localhost",client.flag=CLIENT_MULTI_STATEMENTS)
-load("~/Trivago/Datos/hoteles(25.1.16).RData")
+
 dbListTables(con)
 
 ciudadesp1=ciudades[which(ciudades$feature.code=="ADM3"),]
